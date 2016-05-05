@@ -34,45 +34,40 @@ features = cascade.find("features")
 windowY = 0
 windowX = 0
 while windowY + windowHeight < imageHeight :
-    stageValue = 1
-    stageThreshold = 0
-    stagesNb = len(stages)
+    stagePassed = True
     i = 0
-    while stageValue > stageThreshold and i < stagesNb :
-        
-        stage = stages[i] 
-        stageThreshold = stage.find("stageThreshold").text
-        stageThreshold = float(stageThreshold)
+    for stage in stages:
+        i = i+1
+        print(i)
+        stageValue = 0
+        stageThreshold = float(stage.find("stageThreshold").text)
         weakClassifiers = stage.find("weakClassifiers")        
-        print(i,stagesNb)
         for node in weakClassifiers :
             internalNodes = node.find("internalNodes").text
             leftChildIndex, rightChildIndex, featureIndex, nodeThreshold = (n for n in internalNodes.split())
             featureIndex = int(featureIndex)
             nodeThreshold = float(nodeThreshold)
             leafValues = node.find("leafValues").text        
-            correctLeafValue, incorrectLeafValue = (float(n) for n in leafValues.split())
+            leftLeafValue, rightLeafValue = (float(n) for n in leafValues.split())
             nodeValue = 0
             rects = features[featureIndex].find("rects")
             for rectNode in rects :
                 rect = rectNode.text
                 x,y,width,height,weight = (n for n in rect.split())
                 nodeValue += float(weight)*sumPixel(int(x),int(y),int(width),int(height),im) 
-                #tilt organization
-            if nodeValue > nodeThreshold :
-                stageValue += correctLeafValue
-            else :
-                stageValue += incorrectLeafValue
+            if nodeValue > nodeThreshold : # right
+                stageValue += rightLeafValue
+            else :                         # left
+                stageValue += leftLeafValue
 
-        i += 1
+        if stageValue < stageThreshold:
+            stagePassed = False
+            break;
+
+    if stagePassed:
+        print("passed")
+
     windowX += 10
     if windowX + windowWidth > imageWidth :
         windowY += 10
         windowX = 0
-
-
-    
-    
-
-
-    
