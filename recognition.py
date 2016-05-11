@@ -26,6 +26,10 @@ from PIL import ImageOps # PIL.ImageOps provides several handy filters
 # ImageOps.autocontrast ensures we use the full histogram's scale.
 # pix is an array of pixels that is faster to use when reading pixels.
 # pix2 contains the squared values of the pixels for variance calculation.
+
+if len(sys.argv) != 2:
+    print("Usage :", sys.argv[0], "FileName")
+    sys.exit(1)
 im = Image.open(sys.argv[1])
 imageWidth, imageHeight = im.size
 pixels = im.load()
