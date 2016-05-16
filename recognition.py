@@ -19,6 +19,7 @@ import os, sys, math
 from lxml import etree   # lxml explores the OpenCV's haarcascade .xml file
 from PIL import Image    # PIL.Image loads converts and shows the img to analyze
 from PIL import ImageOps # PIL.ImageOps provides several handy filters
+from PIL import ImageDraw #PIL.ImageDraw draw the figure to cover face
 
 ##### Image and Integral Image #####
 # PIL provides a "I" channel which let us store large values of brightness.
@@ -66,6 +67,7 @@ stages = cascade.find("stages")
 # This detector is made of a couple of nested loops. The first three loops
 # define a "window" in which stages are tested. This window is scaled at 
 # different sizes and carried at different positions. (scale, windowX, windowY)
+listResult = []
 scale, scaleFactor = 1, 1.25
 windowWidth, windowHeight = (int(n) for n in cascade.find("size").text.split())
 while windowWidth < imageWidth and windowHeight < imageHeight:
@@ -159,7 +161,45 @@ while windowWidth < imageWidth and windowHeight < imageHeight:
             if stagePass:
                 # All stages are validated, it means we detected something !
                 print("YAY!", windowX, windowY, windowWidth, windowHeight)
+                listResult.append((windowX, windowY, windowWidth, windowHeight))
 
             windowY += step
         windowX += step
     scale = scale * scaleFactor
+
+##### Cover the detected face #####
+# Draw a rectangle to cover the face
+
+width = 5 #width of line
+newList=[]
+
+def picRect(listResult):
+    maxX,maxY,maxWidth,maxHeight=listResult[0]
+    newList.append((listResult[0]))
+    for rect in listResult :
+        x,y,width,height = rect
+        #detected a new big rectange then add to new list
+        if x+width<maxX or maxX+maxWidth<x or y+height<maxY or maxY+maxHeight<y:
+            maxX=x
+            maxY=y
+            maxWidth=width
+            maxHeight=height
+            newList.append((rect))
+    return newList
+
+picRect(listResult)
+
+for rect in newList :
+    windowX,windowY,windowWidth,windowHeight = rect
+    draw = ImageDraw.Draw(im)
+    draw.line((windowX, windowY, windowX, windowY+windowHeight),
+              (255,0,0,255),width)
+    draw.line((windowX, windowY+width/2, windowX+windowWidth, windowY+width/2),
+              (255,0,0,255),width)#addition half of width
+    draw.line((windowX+windowWidth,windowY,windowX+windowWidth,windowY+windowHeight),
+              (255,0,0,255),width)
+    draw.line((windowX, windowY+windowHeight-width/2, windowX+windowWidth, 
+               windowY+windowHeight-width/2),(255,0,0,255),width)#addition half of width
+    del draw
+
+im.show()
