@@ -63,6 +63,48 @@ cascade = etree.parse("haarcascade_frontalface_alt2.xml").getroot() \
                 .find("haarcascade_frontalface_alt2")
 stages = cascade.find("stages")
 
+bigStages = []
+for stage in stages :
+
+    trees = stage.find("trees")
+    AStage = []
+    for tree in trees :
+        treeArray = []
+
+        for idx in range(2) :
+            nodeArray = []
+            node = tree[idx+1]
+            feature = node.find("feature")
+
+            rects = feature.find("rects")
+            for rect in rects :
+                rectTextSplit = rect.text.split()
+                nodeArray.append(rectTextSplit)
+
+            nodeThreshold = float(node.find("threshold").text)
+            nodeArray.append(nodeThreshold)
+
+            leftValue = node.find("left_val")
+            nodeArray.append(leftValue)
+
+            rightValue = node.find("right_val")
+            nodeArray.append(rightValue)
+
+            leftNode = node.find("left_node")
+            nodeArray.append(leftNode)
+
+            rightNode = node.find("right_node")
+            nodeArray.append(rightNode)
+
+            treeArray.append(nodeArray)
+
+        AStage.append(treeArray)
+
+    stageThreshold = float(stage.find("stage_threshold").text)
+
+    AStage.append(stageThreshold)
+    bigStages.append(AStage)
+
 ##### Detector #####
 # This detector is made of a couple of nested loops. The first three loops
 # define a "window" in which stages are tested. This window is scaled at 
@@ -85,29 +127,35 @@ while windowWidth < imageWidth and windowHeight < imageHeight:
             stagePass = True
 
             stageNb = 0
-            for stage in stages:
+            for stage in bigStages:
                 stageNb = stageNb+1
-                stageThreshold = float(stage.find("stage_threshold").text)
+                stageThreshold = stage[-1]
                 stageSum = 0
 
                 ##### Trees #####
                 # A stage is made of several weak classifiers trees. This code
                 # explores each trees from their root. (idx=0) and computes the
                 # corresponding stageSum.
-                trees = stage.find("trees")
-                for tree in trees:
+                #??????????trees = stage.find("trees")
+                for tree in stage[:-1]:
                     treeValue = 0
                     idx = 0
 
                     while True:
-                        node = tree[idx+1] # +1 is for comment
-                        feature = node.find("feature")
-                        rects = feature.find("rects")
-                        nodeThreshold = float(node.find("threshold").text)
-                        leftValue = node.find("left_val")
-                        rightValue = node.find("right_val")
-                        leftNode = node.find("left_node")
-                        rightNode = node.find("right_node")
+                        node = tree[idx]
+                        #feature = node.find("feature")
+                        #rects = feature.find("rects")
+                        rightNode = node[-1]
+                        leftNode = node[-2]
+                        rightValue = node[-3]
+                        leftValue = node[-4]
+                        nodeThreshold = node[-5]
+
+                        rects = []
+                        rects.append(node[0])
+                        rects.append(node[1])
+                        if len(node) == 8 :
+                            rects.append(node[2])
 
                         ##### Feature #####
                         # A feature is made of several rects. Its value comes
@@ -127,18 +175,17 @@ while windowWidth < imageWidth and windowHeight < imageHeight:
                         if vnorm > 1: vnorm = math.sqrt(vnorm)
                         else        : vnorm = 1
                         for rect in rects:
-                            rectTextSplit = rect.text.split()
-                            x = int(scale*int(rectTextSplit[0]))
-                            y = int(scale*int(rectTextSplit[1]))
-                            width = int(scale*int(rectTextSplit[2]))
-                            height = int(scale*int(rectTextSplit[3]))
-                            weight = float(rectTextSplit[4])
+                            x = int(scale*int(rect[0]))
+                            y = int(scale*int(rect[1]))
+                            width = int(scale*int(rect[2]))
+                            height = int(scale*int(rect[3]))
+                            weight = float(rect[4])
                             featureSum += weight * \
                               (pix[windowX+x+width][windowY+y+height] \
                              + pix[windowX+x][windowY+y] \
                              - pix[windowX+x+width][windowY+y] \
                              - pix[windowX+x][windowY+y+height])
-                        
+                        #print(idx,type(featureSum),type(invArea),nodeThreshold,type(vnorm))
                         if featureSum*invArea < nodeThreshold*vnorm:
                             if leftNode is None:
                                 treeValue = float(leftValue.text)
@@ -160,7 +207,6 @@ while windowWidth < imageWidth and windowHeight < imageHeight:
 
             if stagePass:
                 # All stages are validated, it means we detected something !
-                print("YAY!", windowX, windowY, windowWidth, windowHeight)
                 listResult.append((windowX, windowY, windowWidth, windowHeight))
 
             windowY += step
@@ -170,7 +216,7 @@ while windowWidth < imageWidth and windowHeight < imageHeight:
 ##### Cover the detected face #####
 # Draw a rectangle to cover the face
 
-width = 5 #width of line
+width = 3 #width of line
 newList=[]
 
 def picRect(listResult):
