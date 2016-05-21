@@ -63,47 +63,47 @@ cascade = etree.parse("haarcascade_frontalface_alt2.xml").getroot() \
                 .find("haarcascade_frontalface_alt2")
 stages = cascade.find("stages")
 
-bigStages = []
+#A list is made to stock haar cascade's database
+#This list is made by appending the lists represent the stages
+#Each stage include some trees and a stage threshold
+#Each tree include rects, node threshold, left/right value/node
+listHaarCascade = []
 for stage in stages :
+    stageList = []
 
     trees = stage.find("trees")
-    AStage = []
     for tree in trees :
         treeArray = []
-
         for idx in range(2) :
-            nodeArray = []
+            nodeList = []
             node = tree[idx+1]
             feature = node.find("feature")
-
             rects = feature.find("rects")
+
+            rectsList = ()
             for rect in rects :
                 rectTextSplit = rect.text.split()
-                nodeArray.append(rectTextSplit)
-
+                rectsList += (rectTextSplit,)
+            nodeList.append(rectsList)
             nodeThreshold = float(node.find("threshold").text)
-            nodeArray.append(nodeThreshold)
-
+            nodeList.append(nodeThreshold)
             leftValue = node.find("left_val")
-            nodeArray.append(leftValue)
-
+            nodeList.append(leftValue)
             rightValue = node.find("right_val")
-            nodeArray.append(rightValue)
-
+            nodeList.append(rightValue)
             leftNode = node.find("left_node")
-            nodeArray.append(leftNode)
-
+            nodeList.append(leftNode)
             rightNode = node.find("right_node")
-            nodeArray.append(rightNode)
+            nodeList.append(rightNode)
 
-            treeArray.append(nodeArray)
+            treeArray.append(nodeList)
 
-        AStage.append(treeArray)
+        stageList.append(treeArray)
 
     stageThreshold = float(stage.find("stage_threshold").text)
+    stageList.append(stageThreshold)
 
-    AStage.append(stageThreshold)
-    bigStages.append(AStage)
+    listHaarCascade.append(stageList)
 
 ##### Detector #####
 # This detector is made of a couple of nested loops. The first three loops
@@ -127,7 +127,7 @@ while windowWidth < imageWidth and windowHeight < imageHeight:
             stagePass = True
 
             stageNb = 0
-            for stage in bigStages:
+            for stage in listHaarCascade:
                 stageNb = stageNb+1
                 stageThreshold = stage[-1]
                 stageSum = 0
@@ -136,26 +136,18 @@ while windowWidth < imageWidth and windowHeight < imageHeight:
                 # A stage is made of several weak classifiers trees. This code
                 # explores each trees from their root. (idx=0) and computes the
                 # corresponding stageSum.
-                #??????????trees = stage.find("trees")
                 for tree in stage[:-1]:
                     treeValue = 0
                     idx = 0
 
                     while True:
                         node = tree[idx]
-                        #feature = node.find("feature")
-                        #rects = feature.find("rects")
-                        rightNode = node[-1]
-                        leftNode = node[-2]
-                        rightValue = node[-3]
-                        leftValue = node[-4]
-                        nodeThreshold = node[-5]
-
-                        rects = []
-                        rects.append(node[0])
-                        rects.append(node[1])
-                        if len(node) == 8 :
-                            rects.append(node[2])
+                        rects = node[0]
+                        nodeThreshold = node[1]
+                        leftValue = node[2]
+                        rightValue = node[3]
+                        leftNode = node[4]
+                        rightNode = node[5]
 
                         ##### Feature #####
                         # A feature is made of several rects. Its value comes
@@ -185,7 +177,6 @@ while windowWidth < imageWidth and windowHeight < imageHeight:
                              + pix[windowX+x][windowY+y] \
                              - pix[windowX+x+width][windowY+y] \
                              - pix[windowX+x][windowY+y+height])
-                        #print(idx,type(featureSum),type(invArea),nodeThreshold,type(vnorm))
                         if featureSum*invArea < nodeThreshold*vnorm:
                             if leftNode is None:
                                 treeValue = float(leftValue.text)
@@ -238,6 +229,7 @@ picRect(listResult)
 for rect in newList :
     windowX,windowY,windowWidth,windowHeight = rect
     draw = ImageDraw.Draw(im)
+    #addition half of width to have a perfect corner
     draw.line((windowX, windowY, windowX, windowY+windowHeight),
               (255,0,0,255),width)
     draw.line((windowX, windowY+width/2, windowX+windowWidth, windowY+width/2),
@@ -245,7 +237,7 @@ for rect in newList :
     draw.line((windowX+windowWidth,windowY,windowX+windowWidth,windowY+windowHeight),
               (255,0,0,255),width)
     draw.line((windowX, windowY+windowHeight-width/2, windowX+windowWidth, 
-               windowY+windowHeight-width/2),(255,0,0,255),width)#addition half of width
+               windowY+windowHeight-width/2),(255,0,0,255),width)
     del draw
 
 im.show()
