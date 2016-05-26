@@ -18,32 +18,9 @@
 import os, sys, math
 from lxml import etree   # lxml explores the OpenCV's haarcascade .xml file
 from PIL import Image    # PIL.Image loads converts and shows the img to analyze
-from PIL import ImageOps # PIL.ImageOps provides several handy filters
-from PIL import ImageDraw #PIL.ImageDraw draw the figure to cover face
+from PIL import ImageDraw # PIL.ImageDraw offers primitive to draw lines on img
 
-##### Image and Integral Image #####
-# PIL provides a "I" channel which let us store large values of brightness.
-# This is useful to store the integral image which makes computing faster.
-# ImageOps.autocontrast ensures we use the full histogram's scale.
-# pix is an array of pixels that is faster to use when reading pixels.
-# pix2 contains the squared values of the pixels for variance calculation.
-
-if len(sys.argv) != 2:
-    print("Usage :", sys.argv[0], "FileName")
-    sys.exit(1)
-
-im = Image.open(sys.argv[1])
-imageWidth, imageHeight = im.size
-pixels = im.load()
-pix  = [[int((30*pixels[y,x][0]+59*pixels[y,x][1]+11*pixels[y,x][2])/100) \
-        for x in range(imageWidth)] for y in range(imageHeight)]
-pix2 = [[int((30*pixels[y,x][0]+59*pixels[y,x][1]+11*pixels[y,x][2])/100) \
-        for x in range(imageWidth)] for y in range(imageHeight)]
-
-# Sobel or Canny Edge filters amplify edges and can provide better results :
-# im.filter(ImageFilter.FIND_EDGES)
-
-# Make a integrate image from original image
+# Computes integral image and squared integral image from original image
 def integrateImage(imageWidth,imageHeight) :
     pix2[0][0] = pow(pix2[0][0],2)
     for x in range(imageWidth) :
@@ -58,18 +35,11 @@ def integrateImage(imageWidth,imageHeight) :
                 pix[x][y] += pix[x-1][y] + pix[x][y-1] - pix[x-1][y-1]
                 pix2[x][y]=pix2[x-1][y]+pix2[x][y-1]-pix2[x-1][y-1]+pow(pix2[x][y],2)
 
-##### XML Parsing #####
-# This file format comes from the OpenCV project. It describes an "Haar cascade"
-# A "cascade" is a succession of stages made of several weak classifiers. Each
-# classifier describes an Haar Feature and a threshold to validate the feature.
-cascade = etree.parse("haarcascade_frontalface_alt2.xml").getroot() \
-            .find("haarcascade_frontalface_alt2")
-
-# Function treeStructure stocks haar cascade's database into a tree
+# Stocks haar cascade's database into a tree
 # This tree is made by appending the lists of stages
 # Each stage includes some trees and a stage threshold
 # Each tree includes rects, node threshold, left/right value/node
-def treeStructure() :
+def parseXml() :
     stages = cascade.find("stages")
     listHaarCascade = []
     for stage in stages :
@@ -114,7 +84,6 @@ def treeStructure() :
 # A feature is made of several rects. Its value comes
 # from the linear combination of pixels intensity in
 # those rects with their respective weights.
-
 def evalFeature(windowX,windowY,windowWidth,windowHeight,rects,scale) :
     invArea=1/(windowWidth*windowHeight)
     featureSum = 0
@@ -146,8 +115,7 @@ def evalFeature(windowX,windowY,windowWidth,windowHeight,rects,scale) :
 # For each window, we successively test every stage of the cascade.
 # A stage is validated if its "stageSum" is greater than its
 # stageThreshold. All the stages must be validated to detect a face
-
-def evalStage(windowX,windowY,windowWidth,windowHeight,listHaarCascade,scale) :
+def evalStages(windowX,windowY,windowWidth,windowHeight,listHaarCascade,scale) :
     stagePass = True
     for stage in listHaarCascade:
         stageThreshold = stage[-1]
@@ -170,8 +138,8 @@ def evalStage(windowX,windowY,windowWidth,windowHeight,listHaarCascade,scale) :
                 leftNode = node[4]
                 rightNode = node[5]
 
-                featureSum,invArea,vnorm = evalFeature(windowX,windowY,windowWidth,
-                                                    windowHeight,rects,scale)
+                featureSum,invArea,vnorm = evalFeature(windowX,windowY,
+                              windowWidth, windowHeight,rects,scale)
 
                 if featureSum*invArea < nodeThreshold*vnorm:
                     if leftNode is None:
@@ -198,7 +166,6 @@ def evalStage(windowX,windowY,windowWidth,windowHeight,listHaarCascade,scale) :
 # This detector is made of a couple of nested loops. The first three loops
 # define a "window" in which stages are tested. This window is scaled at 
 # different sizes and carried at different positions. (scale, windowX, windowY)
-
 def detect(imageWidth,imageHeight) :
     listResult = []
     scale, scaleFactor = 1, 1.25
@@ -210,8 +177,7 @@ def detect(imageWidth,imageHeight) :
         while windowX < imageHeight-scale*24:
             windowY = 0
             while windowY < imageWidth-scale*24:
-
-                if evalStage(windowX,windowY,windowWidth,windowHeight,listHaarCascade,scale):
+                if evalStages(windowX,windowY,windowWidth,windowHeight,listHaarCascade,scale):
                     # All stages are validated, it means we detected something !
                     listResult.append((windowX, windowY, windowWidth, windowHeight))
 
@@ -220,12 +186,11 @@ def detect(imageWidth,imageHeight) :
         scale = scale * scaleFactor
     return listResult
 
-# Chose only one rect for each detected face image
-def picRect(listResult):
-    choseenList = []
+# Simplify multiple rects that cover the same area
+def simplifyRects(listResult):
     centreList = []
     maxX,maxY,maxWidth,maxHeight=listResult[0]
-    # eliminate the rectangles which have the same center
+    # Eliminate the rectangles which have the same center
     centreList.append((maxX+maxWidth/2,maxY+maxHeight/2))
     simplifiedList.append((listResult[0]))
     for rect in listResult :
@@ -234,7 +199,7 @@ def picRect(listResult):
             centreX, centreY = centre
             if x < centreX < x+width and y < centreY < y + height :
                 break
-            #detected a new big rectange then add to new list
+            # Detected a new big rectange then add to new list
             elif x+width<maxX or maxX+maxWidth<x or y+height<maxY or maxY+maxHeight<y:
                 maxX=x
                 maxY=y
@@ -244,30 +209,52 @@ def picRect(listResult):
                 centreList.append((maxX+maxWidth/2,maxY+maxHeight/2))
     return simplifiedList
 
-# Draw rectangles cove face image
+# Draw rectangles over face image
 def drawRect(simplifiedList) :
-    widthOfLine = 1 #width of line
+    lineWidth = 1
     for rect in simplifiedList :
         windowX,windowY,windowWidth,windowHeight = rect
         draw = ImageDraw.Draw(im)
-        #addition half of width to have a perfect corner
+        # Adds half of width to have a perfect corner
         draw.line((windowX, windowY, windowX, windowY+windowHeight),
-                  (255,0,0,255),widthOfLine)
-        draw.line((windowX, windowY+widthOfLine/2, windowX+windowWidth, windowY+widthOfLine/2),
-                  (255,0,0,255),widthOfLine)#addition half of width
+                  (255,0,0,255),lineWidth)
+        draw.line((windowX, windowY+lineWidth/2, windowX+windowWidth, windowY+lineWidth/2),
+                  (255,0,0,255),lineWidth) # Adds half of width
         draw.line((windowX+windowWidth,windowY,windowX+windowWidth,windowY+windowHeight),
-                  (255,0,0,255),widthOfLine)
-        draw.line((windowX, windowY+windowHeight-widthOfLine/2, windowX+windowWidth, 
-                   windowY+windowHeight-widthOfLine/2),(255,0,0,255),widthOfLine)
+                  (255,0,0,255),lineWidth)
+        draw.line((windowX, windowY+windowHeight-lineWidth/2, windowX+windowWidth, 
+                   windowY+windowHeight-lineWidth/2),(255,0,0,255),lineWidth)
         del draw
     im.show()
 
+#### Main program ####
+if len(sys.argv) != 2:
+    print("Usage :", sys.argv[0], "FileName")
+    sys.exit(1)
 
-simplifiedList=[]
-# Main program
+##### Image and Integral Image #####
+# PIL provides a "I" channel which let us store large values of brightness.
+# This is useful to store the integral image which makes computing faster.
+# pix is an array of pixels that is faster to use when reading pixels.
+# pix2 contains the squared values of the pixels for variance calculation.
+im = Image.open(sys.argv[1])
+imageWidth, imageHeight = im.size
+pixels = im.load()
+pix  = [[int((30*pixels[y,x][0]+59*pixels[y,x][1]+11*pixels[y,x][2])/100) \
+        for x in range(imageWidth)] for y in range(imageHeight)]
+pix2 = [[pix[x][y] for x in range(imageWidth)] for y in range(imageHeight)]
 integrateImage(imageWidth,imageHeight)
-listHaarCascade = treeStructure()
-listResult = detect(imageWidth,imageHeight)
-choseenList = picRect(listResult)
-drawRect(choseenList)
 
+##### XML Parsing #####
+# This file format comes from the OpenCV project. It describes an "Haar cascade"
+# A "cascade" is a succession of stages made of several weak classifiers. Each
+# classifier describes an Haar Feature and a threshold to validate the feature.
+cascade = etree.parse("haarcascade_frontalface_alt2.xml").getroot() \
+                .find("haarcascade_frontalface_alt2")
+listHaarCascade = parseXml()
+
+##### Detection and simplification #####
+simplifiedList=[]
+listResult = detect(imageWidth,imageHeight)
+chosenList = simplifyRects(listResult)
+drawRect(chosenList)
