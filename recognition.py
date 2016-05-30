@@ -188,26 +188,29 @@ def detect(imageWidth,imageHeight) :
 
 # Simplify multiple rects that cover the same area
 def simplifyRects(listResult):
-    centreList = []
-    maxX,maxY,maxWidth,maxHeight=listResult[0]
-    # Eliminate the rectangles which have the same center
-    centreList.append((maxX+maxWidth/2,maxY+maxHeight/2))
-    simplifiedList.append((listResult[0]))
-    for rect in listResult :
-        x,y,width,height = rect
-        for centre in centreList :
-            centreX, centreY = centre
-            if x < centreX < x+width and y < centreY < y + height :
-                break
-            # Detected a new big rectange then add to new list
-            elif x+width<maxX or maxX+maxWidth<x or y+height<maxY or maxY+maxHeight<y:
-                maxX=x
-                maxY=y
-                maxWidth=width
-                maxHeight=height
-                simplifiedList.append((rect))
-                centreList.append((maxX+maxWidth/2,maxY+maxHeight/2))
-    return simplifiedList
+    if len(listResult)>0:
+        centerList = []
+        maxX,maxY,maxWidth,maxHeight=listResult[0]
+        # Eliminate the rectangles which have the same center
+        centerList.append((maxX+maxWidth/2,maxY+maxHeight/2))
+        simplifiedList.append((listResult[0]))
+        for rect in listResult :
+            x,y,width,height = rect
+            for center in centerList :
+                centerX, centerY = center
+                if x < centerX < x+width and y < centerY < y + height :
+                    break
+                # Detected a new big rectange then add to new list
+                elif x+width<maxX or maxX+maxWidth<x or y+height<maxY or maxY+maxHeight<y:
+                    maxX=x
+                    maxY=y
+                    maxWidth=width
+                    maxHeight=height
+                    simplifiedList.append((rect))
+                    centerList.append((maxX+maxWidth/2,maxY+maxHeight/2))
+        return simplifiedList
+    else:
+        return []
 
 # Draw rectangles over face image
 def drawRect(simplifiedList) :
