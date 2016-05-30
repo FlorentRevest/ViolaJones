@@ -242,7 +242,7 @@ imageWidth, imageHeight = im.size
 pixels = im.load()
 pix  = [[int((30*pixels[y,x][0]+59*pixels[y,x][1]+11*pixels[y,x][2])/100) \
         for x in range(imageWidth)] for y in range(imageHeight)]
-pix2 = [[pix[x][y] for x in range(imageWidth)] for y in range(imageHeight)]
+pix2 = [[pix[y][x] for x in range(imageWidth)] for y in range(imageHeight)]
 integrateImage(imageWidth,imageHeight)
 
 ##### XML Parsing #####
