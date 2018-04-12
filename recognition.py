@@ -85,7 +85,7 @@ def parseXml() :
 # from the linear combination of pixels intensity in
 # those rects with their respective weights.
 def evalFeature(windowX,windowY,windowWidth,windowHeight,rects,scale) :
-    invArea=1/(windowWidth*windowHeight)
+    invArea=1.0/(windowWidth*windowHeight)
     featureSum = 0
     totalX=pix[windowX+windowWidth][windowY+windowHeight] \
           +pix[windowX][windowY] \
